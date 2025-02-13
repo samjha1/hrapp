@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hrms/camera.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -12,34 +13,7 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 final List<String> indianStates = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
   'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal'
 ];
 
 String? selectedState;
@@ -51,6 +25,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   TimeOfDay outTime = const TimeOfDay(hour: 16, minute: 0);
   String currentLocation = 'Fetching location...';
   String _username = '';
+  String _image = '';
   String _empid = '';
 
   @override
@@ -400,6 +375,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => CameraPage()),
+                        );
+                      },
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[200],
+                        child: Icon(Icons.camera_alt,
+                            size: 50, color: Colors.grey[600]),
                       ),
                     ),
 
