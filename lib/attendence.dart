@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hrms/camera.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -13,23 +14,20 @@ class AttendanceScreen extends StatefulWidget {
   _AttendanceScreenState createState() => _AttendanceScreenState();
 }
 
-final List<String> indianStates = [
-  'Karnataka',
-];
-
-String? selectedState;
-
 class _AttendanceScreenState extends State<AttendanceScreen> {
   GoogleMapController? _mapController;
   LatLng _currentPosition =
       const LatLng(12.9716, 77.5946); // Default to Bangalore
   Set<Marker> _markers = {};
+  String currentLocation = 'Fetching location...';
+  String placeName = '';
+  String cityName = '';
+  String stateName = '';
 
   final TextEditingController _remarksController = TextEditingController();
 
   TimeOfDay inTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay outTime = const TimeOfDay(hour: 16, minute: 0);
-  String currentLocation = 'Fetching location...';
   String _username = '';
   String _image = '';
   String _empid = '';
@@ -93,22 +91,50 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
       );
-      setState(() {
-        currentLocation = '${position.latitude}, ${position.longitude}';
-        _currentPosition = LatLng(position.latitude, position.longitude);
-        _markers = {
-          Marker(
-            markerId: const MarkerId('current_location'),
-            position: _currentPosition,
-          ),
-        };
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLng(_currentPosition),
-        );
-      });
+
+      _updateLocation(position.latitude, position.longitude);
     } catch (e) {
       setState(() {
         currentLocation = 'Unable to fetch location';
+      });
+    }
+  }
+
+  Future<void> _updateLocation(double latitude, double longitude) async {
+    try {
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(latitude, longitude);
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+
+        setState(() {
+          _currentPosition = LatLng(latitude, longitude);
+          placeName = place.name ?? "";
+          cityName = place.locality ?? "";
+          stateName = place.administrativeArea ?? "";
+          currentLocation =
+              '$placeName, $cityName, $stateName'; // Display in UI
+
+          _markers = {
+            Marker(
+              markerId: const MarkerId('current_location'),
+              position: _currentPosition,
+              infoWindow: InfoWindow(
+                title: 'Current Location',
+                snippet: '$placeName, $cityName, $stateName',
+              ),
+            ),
+          };
+
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLng(_currentPosition),
+          );
+        });
+      }
+    } catch (e) {
+      setState(() {
+        currentLocation = 'Failed to get place name';
       });
     }
   }
@@ -241,7 +267,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ),
                           const SizedBox(width: 16),
                           Text(
-                            'Nandi Properties',
+                            'InDataAi',
                             style: TextStyle(
                               color: Colors.grey[700],
                               fontSize: 14,
@@ -383,34 +409,29 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
 
                     // Location Selection
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedState,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedState = newValue!;
-                            });
-                          },
-                          items: indianStates
-                              .map<DropdownMenuItem<String>>(
-                                  (String state) => DropdownMenuItem<String>(
-                                        value: state,
-                                        child: Text(state),
-                                      ))
-                              .toList(),
-                          hint: const Text('Select Work Location'),
-                        ),
-                      ),
-                    ),
+                    // Padding(
+                    //   padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    //   child: Container(
+                    //     padding: const EdgeInsets.symmetric(
+                    //         horizontal: 12, vertical: 10),
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.grey[100],
+                    //       borderRadius: BorderRadius.circular(8),
+                    //     ),
+                    //     child: TextField(
+                    //       controller: TextEditingController(
+                    //         text: _currentPosition != null
+                    //             ? "${_currentPosition.latitude}, ${_currentPosition.longitude}"
+                    //             : "Fetching location...",
+                    //       ),
+                    //       readOnly: true, // Prevent user from editing manually
+                    //       decoration: const InputDecoration(
+                    //         labelText: 'Work Location',
+                    //         border: OutlineInputBorder(),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
 
                     // Remarks
                     Padding(
@@ -453,7 +474,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             'username': _username,
                             'employee_id': _empid,
                             'location': currentLocation,
-                            'state': selectedState ?? '',
+                            'state':
+                                '${_currentPosition.latitude}, ${_currentPosition.longitude}',
                             'in_time': _formatTime(inTime),
                             'out_time': _formatTime(outTime),
                             'remarks': _remarksController.text,
