@@ -27,12 +27,26 @@ class _CameraPageState extends State<CameraPage> {
 
   Future<void> _initializeCamera() async {
     _cameras = await availableCameras();
+
     if (_cameras != null && _cameras!.isNotEmpty) {
-      _controller = CameraController(_cameras![0], ResolutionPreset.medium);
+      // Find the front (selfie) camera
+      CameraDescription frontCamera = _cameras!.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+      );
+
+      _controller = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false, // Disable audio if not needed
+      );
+
       await _controller!.initialize();
-      setState(() {
-        _isCameraInitialized = true;
-      });
+
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+      }
     }
   }
 
@@ -119,7 +133,10 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           Expanded(
             child: _isCameraInitialized
-                ? CameraPreview(_controller!)
+                ? Transform.rotate(
+                    angle: -1.5708, // Rotate by 90 degrees for landscape mode
+                    child: CameraPreview(_controller!),
+                  )
                 : Center(child: CircularProgressIndicator()),
           ),
           if (_capturedImage != null || _webImageBytes != null) ...[
