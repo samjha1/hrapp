@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hrms/camera.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -19,6 +20,11 @@ final List<String> indianStates = [
 String? selectedState;
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
+  GoogleMapController? _mapController;
+  LatLng _currentPosition =
+      const LatLng(12.9716, 77.5946); // Default to Bangalore
+  Set<Marker> _markers = {};
+
   final TextEditingController _remarksController = TextEditingController();
 
   TimeOfDay inTime = const TimeOfDay(hour: 8, minute: 0);
@@ -33,6 +39,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     _getCurrentLocation();
     _loadUsername();
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('current_location'),
+        position: _currentPosition,
+      ),
+    );
   }
 
   _loadUsername() async {
@@ -83,6 +95,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
       setState(() {
         currentLocation = '${position.latitude}, ${position.longitude}';
+        _currentPosition = LatLng(position.latitude, position.longitude);
+        _markers = {
+          Marker(
+            markerId: const MarkerId('current_location'),
+            position: _currentPosition,
+          ),
+        };
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(_currentPosition),
+        );
       });
     } catch (e) {
       setState(() {
@@ -136,7 +158,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       body: Column(
         children: [
-          // Dynamic Location Header
+          // Map Container
+          Container(
+            height: 200,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _currentPosition,
+                zoom: 15,
+              ),
+              onMapCreated: (GoogleMapController controller) {
+                setState(() {
+                  _mapController = controller;
+                  controller.animateCamera(
+                    CameraUpdate.newLatLng(_currentPosition),
+                  );
+                });
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              markers: _markers,
+              mapType: MapType.normal,
+            ),
+          ),
+
+          // Location Header
           Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -144,18 +189,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               children: [
                 const Icon(Icons.location_on, color: Colors.white70, size: 16),
                 const SizedBox(width: 4),
-                Text(
-                  currentLocation,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    currentLocation,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
 
-          // Rest of the existing code remains the same
+          // Main Content
           Expanded(
             child: Container(
               margin: const EdgeInsets.only(top: 16),
@@ -184,7 +232,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             ),
                             child: Text(
                               _empid,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.black87,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -399,7 +447,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: ElevatedButton(
                         onPressed: () async {
-                          // Attendance API submission logic here
                           var url = Uri.parse(
                               'https://landlink.in/attendence_api.php');
                           var response = await http.post(url, body: {
@@ -412,13 +459,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             'remarks': _remarksController.text,
                           });
                           if (response.statusCode == 200) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text('Attendance successfully marked'),
-                            ));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Attendance successfully marked'),
+                              ),
+                            );
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text('Failed to mark attendance'),
-                            ));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to mark attendance'),
+                              ),
+                            );
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -466,5 +517,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _remarksController.dispose();
+    _mapController?.dispose();
+    super.dispose();
   }
 }
